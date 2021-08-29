@@ -1,0 +1,130 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  ip-memo
+
+  Simple Rest API to memorize caller MachineID + IP address pair
+
+Globals:
+  Function:
+    Timeout: 3
+  Api:
+    OpenApiVersion: 3.0.3
+
+Parameters:
+  EnvironmentType:
+    Description: The environment type
+    Type: String
+    Default: prod
+    AllowedValues:
+      - prod
+      - dev
+    ConstraintDescription: must be a prod or dev
+
+Resources:
+  IpMemoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ip_memo/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      ReservedConcurrentExecutions: 2
+      Environment:
+        Variables:
+          TABLE_NAME: !Join [ "", ["ip-memo-table-", !Ref EnvironmentType]]
+      Events:
+        IpMemoGetMyIp:
+          Type: Api
+          Properties:
+            Path: /my-ip
+            Method: get
+            RestApiId:
+              Ref: IpMemoRestApi
+        IpMemoPostMachineIpPair:
+          Type: Api
+          Properties:
+            Path: /persisted-ip/{machine_id}
+            Method: post
+            RestApiId:
+              Ref: IpMemoRestApi
+            Auth:
+              ApiKeyRequired: true   # 'x-api-key' header to pass the otken
+        IpMemoGetMachineIpPair:
+          Type: Api
+          Properties:
+            Path: /persisted-ip/{machine_id}
+            Method: get
+            RestApiId:
+              Ref: IpMemoRestApi
+      Policies:
+        - Statement:
+            - Sid: IpMemoDynamoDBAccessPolicy
+              Effect: Allow
+              Action:
+                - 'dynamodb:GetItem'
+                - 'dynamodb:PutItem'
+              Resource: !GetAtt IpMemoDb.Arn
+  IpMemoAccessLogsGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ "", ["ip-memo-access-logs-", !Ref EnvironmentType]]
+      RetentionInDays: 5
+  IpMemoRestApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref EnvironmentType
+      AccessLogSetting:
+        DestinationArn: !GetAtt IpMemoAccessLogsGroup.Arn
+        Format: $context.identity.sourceIp $context.identity.caller $context.identity.user [$context.requestTime] "$context.httpMethod $context.resourcePath $context.protocol" $context.status $context.responseLength $context.requestId
+      MethodSettings:
+        - HttpMethod: '*'
+          ResourcePath: '/*'
+          LoggingLevel: 'INFO'
+          ThrottlingRateLimit: 1
+          ThrottlingBurstLimit: 2
+          DataTraceEnabled: 'false'
+  IpMemoRestApiLoggingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+  IpMemoApiGatewayAccount:
+    Type: 'AWS::ApiGateway::Account'
+    Properties:
+      CloudWatchRoleArn: !GetAtt IpMemoRestApiLoggingRole.Arn
+  IpMemoDb:
+    Type: 'AWS::Serverless::SimpleTable'
+    Properties:
+      TableName: !Join [ "", ["ip-memo-table-", !Ref EnvironmentType]]
+      PrimaryKey:
+        Name: id
+        Type: String
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      SSESpecification:
+        SSEEnabled: true
+#      TimeToLiveSpecification:
+#        AttributeName: "ttl"
+#        Enabled: 'true'
+
+
+Outputs:
+  IpMemoApi:
+    Description: "API Gateway endpoint URL for ${EnvironmentType} stage for IpMemo function"
+    Value: !Sub "https://${IpMemoRestApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentType}/my-ip/"
+  IpMemoFunction:
+    Description: "Lambda Function ARN"
+    Value: !GetAtt IpMemoFunction.Arn
+  IpMemoFunctionIamRole:
+    Description: "Implicit IAM Role created for IpMemo function"
+    Value: !GetAtt IpMemoFunctionRole.Arn

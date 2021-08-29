@@ -1,0 +1,17 @@
+GET https://API_ID.execute-api.API_REGION.amazonaws.com/prod/persisted-ip/mymachine-id
+Accept: application/json
+
+###
+GET https://API_ID.execute-api.API_REGION.amazonaws.com/prod/my-ip/
+Accept: application/json
+
+###
+POST https://API_ID.execute-api.API_REGION.amazonaws.com/prod/persisted-ip/mymachine-id
+Content-Type: application/json
+x-api-key: YOUR_AUTH_KEY
+
+{}
+
+###
+
+
