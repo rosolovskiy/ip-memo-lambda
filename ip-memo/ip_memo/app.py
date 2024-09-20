@@ -11,17 +11,23 @@ TEST_MACHINE_ID = "test"
 TEST_IP_ADDRESS = "test-invoke-source-ip"
 IP_STORE_TTL = 1296000  # 15 days in seconds
 LOCAL_RUN = False if "LOCAL_RUN" not in os.environ else os.environ["LOCAL_RUN"] == "TRUE"
+CORS_ORIGINS = ('http://traffic.enroute.im', )
 
 
-def success_response(body=None):
+def success_response(body=None, allow_cors=False):
     if body is None:
         body = {}
+    headers = {
+        "content-type": "application/json"
+    }
+    if allow_cors:
+        headers['Access-Control-Allow-Origin'] = ', '.join(CORS_ORIGINS)
+        headers['Access-Control-Allow-Methods'] = "OPTIONS, GET"
+        headers['Access-Control-Allow-Headers'] = "Accept, Content-Type"
     return {
         "statusCode": 200,
         "body": json.dumps(body),
-        "headers": {
-            "content-type": "application/json"
-        }
+        "headers": headers
     }
 
 
@@ -91,8 +97,11 @@ def lambda_handler(event, context):
         Return doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html
     """
 
+    if event and event["httpMethod"] == 'OPTIONS' and ROUTE_GET_MY_IP in event['path']:
+        return success_response(allow_cors=True)
+
     if event and event["httpMethod"] == 'GET' and ROUTE_GET_MY_IP in event['path']:
-        return success_response({"ip": get_source_ip(event)})
+        return success_response({"ip": get_source_ip(event)}, True)
 
     if event and event["httpMethod"] == 'GET' and ROUTE_PERSISTED_IP in event['path']:
         machine_id = event["pathParameters"]["machine_id"]

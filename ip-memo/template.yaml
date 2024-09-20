@@ -27,7 +27,7 @@ Resources:
     Properties:
       CodeUri: ip_memo/
       Handler: app.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.11
       ReservedConcurrentExecutions: 2
       Environment:
         Variables:
@@ -38,6 +38,13 @@ Resources:
           Properties:
             Path: /my-ip
             Method: get
+            RestApiId:
+              Ref: IpMemoRestApi
+        IpMemoOptionMyIp:
+          Type: Api
+          Properties:
+            Path: /my-ip
+            Method: options
             RestApiId:
               Ref: IpMemoRestApi
         IpMemoPostMachineIpPair:
