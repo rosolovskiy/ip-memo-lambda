@@ -2,6 +2,8 @@ import os
 import json
 import time
 import datetime
+from typing import Optional
+
 import boto3
 
 ROUTE_GET_MY_IP = "my-ip"
@@ -14,14 +16,14 @@ LOCAL_RUN = False if "LOCAL_RUN" not in os.environ else os.environ["LOCAL_RUN"] 
 CORS_ORIGINS = ('http://traffic.enroute.im', 'http://talk.enroute.im')
 
 
-def success_response(body=None, allow_cors=False):
+def success_response(body=None, cors_origin:str=None):
     if body is None:
         body = {}
     headers = {
         "content-type": "application/json"
     }
-    if allow_cors:
-        headers['Access-Control-Allow-Origin'] = ', '.join(CORS_ORIGINS)
+    if cors_origin:
+        headers['Access-Control-Allow-Origin'] = cors_origin
         headers['Access-Control-Allow-Methods'] = "OPTIONS, GET"
         headers['Access-Control-Allow-Headers'] = "Accept, Content-Type"
     return {
@@ -96,12 +98,21 @@ def lambda_handler(event, context):
 
         Return doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html
     """
+    def fetch_origin(lambda_event) -> Optional[str]:
+        if lambda_event and "headers" in lambda_event:
+            for header_option in ('origin', 'Origin'):
+                if header_option in lambda_event["headers"]:
+                    return lambda_event["headers"][header_option]
+        return None
+
+    origin = fetch_origin(event)
+    cors_origin = origin if origin in CORS_ORIGINS else None
 
     if event and event["httpMethod"] == 'OPTIONS' and ROUTE_GET_MY_IP in event['path']:
-        return success_response(allow_cors=True)
+        return success_response(cors_origin=cors_origin)
 
     if event and event["httpMethod"] == 'GET' and ROUTE_GET_MY_IP in event['path']:
-        return success_response({"ip": get_source_ip(event)}, True)
+        return success_response({"ip": get_source_ip(event)}, cors_origin)
 
     if event and event["httpMethod"] == 'GET' and ROUTE_PERSISTED_IP in event['path']:
         machine_id = event["pathParameters"]["machine_id"]
