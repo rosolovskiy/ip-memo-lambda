@@ -11,7 +11,7 @@ TEST_MACHINE_ID = "test"
 TEST_IP_ADDRESS = "test-invoke-source-ip"
 IP_STORE_TTL = 1296000  # 15 days in seconds
 LOCAL_RUN = False if "LOCAL_RUN" not in os.environ else os.environ["LOCAL_RUN"] == "TRUE"
-CORS_ORIGINS = ('http://traffic.enroute.im', )
+CORS_ORIGINS = ('http://traffic.enroute.im', 'http://talk.enroute.im')
 
 
 def success_response(body=None, allow_cors=False):
