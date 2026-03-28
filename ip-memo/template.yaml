@@ -27,7 +27,7 @@ Resources:
     Properties:
       CodeUri: ip_memo/
       Handler: app.lambda_handler
-      Runtime: python3.11
+      Runtime: python3.14
       ReservedConcurrentExecutions: 2
       Environment:
         Variables:
